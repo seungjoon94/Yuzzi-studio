@@ -99,7 +99,7 @@ def index():
 # ── 백그라운드 스케줄러 ─────────────────────────────────────────────────────
 
 def _scheduler():
-    """서버 시작 시 즉시 1회 수집, 이후 1시간마다 반복"""
+    """서버 시작 시 즉시 1회 수집, 이후 매 정각마다 수집"""
     time.sleep(2)  # Flask 완전 시작 대기
     while True:
         try:
@@ -107,7 +107,13 @@ def _scheduler():
             log.info("스케줄 수집 결과: %s", result)
         except Exception as e:
             log.error("스케줄 수집 오류: %s", e)
-        time.sleep(3600)
+
+        # 다음 정각까지 대기
+        now = time.time()
+        next_hour = (now // 3600 + 1) * 3600
+        sleep_secs = next_hour - now
+        log.info("다음 수집까지 %.0f초 (다음 정각)", sleep_secs)
+        time.sleep(sleep_secs)
 
 
 def start_scheduler():
