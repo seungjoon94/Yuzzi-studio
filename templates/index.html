@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>유찌 스튜디오</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --yellow:       #F9E000;
+      --yellow-dark:  #e6ce00;
+      --blue:         #3867d6;
+      --bg:           #f5f6f8;
+      --card:         #ffffff;
+      --border:       #e8e9eb;
+      --text:         #1a1a1a;
+      --muted:        #888;
+      --radius:       12px;
+      --sidebar-w:    220px;
+      --sidebar-bg:   #16162a;
+      --sidebar-text: rgba(255,255,255,.7);
+      --sidebar-act:  #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                   "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ══════════════════════════════════════
+       사이드바
+    ══════════════════════════════════════ */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 로고 */
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px; height: 36px;
+      background: var(--yellow);
+      border-radius: 10px;
+      font-size: 17px;
+      font-weight: 900;
+      color: #111;
+      margin-bottom: 10px;
+    }
+    .logo-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.3px;
+    }
+    .logo-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,.4);
+      margin-top: 2px;
+    }
+
+    /* 섹션 라벨 */
+    .sidebar-section {
+      padding: 20px 20px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+    }
+
+    /* 메뉴 아이템 */
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      margin: 2px 10px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--sidebar-text);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .sidebar-item:hover {
+      background: rgba(255,255,255,.07);
+      color: #fff;
+    }
+    .sidebar-item.active {
+      background: rgba(249,224,0,.15);
+      color: var(--yellow);
+      font-weight: 600;
+    }
+    .sidebar-icon {
+      width: 20px;
+      text-align: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .sidebar-badge {
+      margin-left: auto;
+      background: var(--yellow);
+      color: #222;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    /* 사이드바 하단 */
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      font-size: 11px;
+      color: rgba(255,255,255,.25);
+      line-height: 1.6;
+    }
+
+    /* ══════════════════════════════════════
+       메인 콘텐츠
+    ══════════════════════════════════════ */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 패널 */
+    .page { display: none; flex: 1; flex-direction: column; }
+    .page.active { display: flex; }
+
+    /* ══════════════════════════════════════
+       공통 버튼
+    ══════════════════════════════════════ */
+    .btn {
+      padding: 6px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      cursor: pointer;
+      background: var(--card);
+      color: #444;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #efefef; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .btn-yellow {
+      background: var(--yellow);
+      border-color: var(--yellow-dark);
+      font-weight: 600;
+      color: #222;
+    }
+    .btn-yellow:hover { background: var(--yellow-dark); }
+
+    /* ══════════════════════════════════════
+       실시간 페이지
+    ══════════════════════════════════════ */
+    .live-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px 0;
+    }
+    .live-topbar-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .live-title { font-size: 18px; font-weight: 700; }
+    .live-time  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .keyword-bar-wrap {
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 12px;
+    }
+    .keyword-bar-wrap::-webkit-scrollbar { display: none; }
+    .keyword-bar { display: flex; gap: 8px; width: max-content; }
+
+    .keyword-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 14px;
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    .keyword-chip:hover { border-color: #bbb; }
+    .keyword-chip.active {
+      border-color: var(--yellow-dark);
+      background: var(--yellow);
+      font-weight: 600;
+    }
+    .keyword-chip .rank { font-size: 11px; font-weight: 700; color: var(--blue); }
+    .keyword-chip.active .rank { color: #333; }
+
+    .live-content {
+      padding: 24px 24px 60px;
+      flex: 1;
+    }
+    .section-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 16px;
+    }
+    .section-kw    { font-size: 18px; font-weight: 700; }
+    .section-count { font-size: 13px; color: var(--muted); }
+
+    .emot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 14px;
+    }
+    .emot-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--border);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .emot-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 18px rgba(0,0,0,.1);
+    }
+    .emot-img {
+      width: 100%; aspect-ratio: 1;
+      object-fit: cover;
+      background: #f9f9f9;
+      display: block;
+    }
+    .emot-title {
+      padding: 7px 9px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #444;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ══════════════════════════════════════
+       기록 페이지
+    ══════════════════════════════════════ */
+    .hist-topbar {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hist-topbar-title { font-size: 18px; font-weight: 700; }
+    .hist-topbar-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .hist-body {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 0;
+      flex: 1;
+      align-items: start;
+      min-height: 0;
+    }
+    @media (max-width: 900px) {
+      .hist-body { grid-template-columns: 1fr; }
+    }
+
+    /* 스냅샷 목록 */
+    .snap-list-panel {
+      border-right: 1px solid var(--border);
+      background: var(--card);
+      position: sticky;
+      top: 0;
+      max-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .snap-list-head {
+      padding: 14px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .snap-list-scroll {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .snap-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .snap-item:last-child { border-bottom: none; }
+    .snap-item:hover  { background: #fafafa; }
+    .snap-item.active { background: #fffde7; }
+    .snap-time {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .snap-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .preview-tag {
+      font-size: 11px;
+      background: #f0f2f5;
+      color: #555;
+      padding: 2px 7px;
+      border-radius: 8px;
+    }
+    .preview-tag.top { background: var(--yellow); color: #333; font-weight: 600; }
+
+    /* 히스토리 상세 */
+    .hist-detail-panel {
+      padding: 20px 24px 60px;
+    }
+    .hist-detail-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .hist-card-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hist-card-title { font-size: 15px; font-weight: 700; }
+    .hist-card-sub   { font-size: 12px; color: var(--muted); }
+
+    .hist-kw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      padding: 16px 18px;
+    }
+    .hist-kw-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 6px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+    }
+    .hist-kw-card:hover {
+      border-color: var(--yellow-dark);
+      background: #fffde7;
+    }
+    .hist-kw-card.active {
+      border-color: var(--yellow-dark);
+      background: var(--yellow);
+    }
+    .hist-kw-rank {
+      font-size: 18px; font-weight: 800; color: var(--blue);
+    }
+    .hist-kw-card.active .hist-kw-rank { color: #222; }
+    .hist-kw-name { font-size: 12px; font-weight: 500; word-break: keep-all; line-height: 1.3; }
+
+    .hist-emot-area {
+      border-top: 1px solid var(--border);
+      padding: 16px 18px;
+    }
+    .hist-emot-head {
+      font-size: 14px; font-weight: 600;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hist-emot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    /* ══════════════════════════════════════
+       시간대별 분석 페이지
+    ══════════════════════════════════════ */
+    .trends-topbar {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .trends-topbar-title { font-size: 18px; font-weight: 700; }
+    .trends-topbar-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .trends-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .trends-meta strong { color: var(--text); font-size: 15px; }
+
+    .trends-body {
+      padding: 24px;
+      flex: 1;
+    }
+
+    /* 시간대별 테이블 */
+    .hour-table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .hour-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .hour-table thead th {
+      background: #f9fafb;
+      padding: 9px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: left;
+      border-bottom: 2px solid var(--border);
+    }
+    .hour-table thead th.th-kws { width: 100%; }
+
+    .hour-row {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    .hour-row:last-child { border-bottom: none; }
+    .hour-row:hover { background: #fafcff; }
+    .hour-row.no-data { opacity: .45; }
+
+    .td-hour {
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      vertical-align: middle;
+      width: 56px;
+      border-right: 1px solid var(--border);
+    }
+    .td-count {
+      padding: 10px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      vertical-align: middle;
+      width: 40px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .td-kws {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+    .kw-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .kw-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .kw-chip .cr { font-weight: 800; font-size: 11px; }
+    /* 순위별 색상 */
+    .kw-chip.r1  { background:#F9E000; border-color:#e6ce00; color:#222; }
+    .kw-chip.r2  { background:#FFF176; border-color:#f0e020; color:#333; }
+    .kw-chip.r3  { background:#FFF9C4; border-color:#f5e840; color:#333; }
+    .kw-chip.r4  { background:#f5f5f5; border-color:#ddd; color:#444; }
+    .kw-chip.rN  { background:#f0f1f3; border-color:#e0e0e0; color:#666; }
+
+    .no-data-text {
+      font-size: 12px;
+      color: #ccc;
+      font-style: italic;
+    }
+
+    /* 데이터 부족 배너 */
+    .data-notice {
+      background: #fffde7;
+      border: 1px solid var(--yellow-dark);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 빈 상태 */
+    .placeholder {
+      padding: 50px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .empty-snap {
+      padding: 40px 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    /* 공통 상태 */
+    .loading {
+      padding: 50px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .error { padding: 30px; text-align: center; color: #e74c3c; font-size: 14px; }
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid #ddd; border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════ 사이드바 ════════════════ -->
+<aside class="sidebar">
+
+  <div class="sidebar-logo">
+    <div class="logo-badge">유</div>
+    <div class="logo-name">유찌 스튜디오</div>
+    <div class="logo-sub">Yujji Studio</div>
+  </div>
+
+  <div class="sidebar-section">이모티콘 트렌드</div>
+
+  <div class="sidebar-item active" data-page="live">
+    <span class="sidebar-icon">📡</span>
+    실시간 키워드
+  </div>
+  <div class="sidebar-item" data-page="history">
+    <span class="sidebar-icon">🗂</span>
+    기록 보기
+    <span class="sidebar-badge" id="snapshotBadge"></span>
+  </div>
+  <div class="sidebar-item" data-page="trends">
+    <span class="sidebar-icon">📊</span>
+    시간대별 분석
+  </div>
+
+  <div class="sidebar-footer">
+    카카오 이모티콘샵<br>트렌드 수집기 v2
+  </div>
+
+</aside>
+
+<!-- ════════════════ 메인 ════════════════ -->
+<main class="main">
+
+  <!-- ── 실시간 페이지 ── -->
+  <div class="page active" id="page-live">
+
+    <div class="live-topbar">
+      <div class="live-topbar-row">
+        <div>
+          <div class="live-title">지금 뜨는 키워드</div>
+          <div class="live-time" id="liveRankingTime">로딩 중...</div>
+        </div>
+        <button class="btn" id="refreshBtn" onclick="liveRefresh()">↺ 새로고침</button>
+      </div>
+      <div class="keyword-bar-wrap">
+        <div class="keyword-bar" id="liveKeywordBar">
+          <div class="loading"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="live-content" id="liveEmotSection">
+      <div class="loading"><span class="spinner"></span>이모티콘 로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- ── 기록 페이지 ── -->
+  <div class="page" id="page-history">
+
+    <div class="hist-topbar">
+      <div>
+        <div class="hist-topbar-title">기록 보기</div>
+        <div class="hist-topbar-sub">시간대별 인기 키워드와 이모티콘</div>
+      </div>
+      <button class="btn btn-yellow" onclick="captureNow()">지금 저장</button>
+    </div>
+
+    <div class="hist-body">
+
+      <!-- 스냅샷 목록 -->
+      <div class="snap-list-panel">
+        <div class="snap-list-head">
+          <span>저장된 기록</span>
+          <span id="snapCount" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div class="snap-list-scroll" id="snapshotList">
+          <div class="loading"><span class="spinner"></span></div>
+        </div>
+      </div>
+
+      <!-- 상세 -->
+      <div class="hist-detail-panel" id="histDetail">
+        <div class="hist-detail-card">
+          <div class="placeholder">← 왼쪽에서 시간대를 선택하면<br>키워드와 이모티콘을 볼 수 있어요</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 시간대별 분석 페이지 ── -->
+  <div class="page" id="page-trends">
+
+    <div class="trends-topbar">
+      <div>
+        <div class="trends-topbar-title">시간대별 분석</div>
+        <div class="trends-topbar-sub">수집된 데이터 기준 · 시간대별 키워드 평균 순위</div>
+      </div>
+      <div class="trends-meta" id="trendsMeta"></div>
+    </div>
+
+    <div class="trends-body" id="trendsBody">
+      <div class="loading"><span class="spinner"></span>분석 중...</div>
+    </div>
+
+  </div>
+
+</main>
+
+
+<script>
+/* ── 유틸 ── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function fmtKST(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("ko-KR", {
+    timeZone:"Asia/Seoul",
+    year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", hour12:false,
+  });
+}
+function fmtShort(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("ko-KR", {
+    timeZone:"Asia/Seoul",
+    month:"numeric", day:"numeric",
+    hour:"2-digit", minute:"2-digit", hour12:false,
+  });
+}
+
+
+/* ── 사이드바 메뉴 전환 ── */
+document.querySelectorAll(".sidebar-item[data-page]").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".sidebar-item").forEach(i => i.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    item.classList.add("active");
+    document.getElementById("page-" + item.dataset.page).classList.add("active");
+    if (item.dataset.page === "history") loadHistory();
+    if (item.dataset.page === "trends")  { trendsLoaded = false; loadTrends(); }
+  });
+});
+
+
+/* ════════ 실시간 ════════ */
+let liveKeywords = [];
+let liveActiveId = null;
+
+async function liveLoadKeywords() {
+  document.getElementById("liveKeywordBar").innerHTML =
+    `<div class="loading"><span class="spinner"></span></div>`;
+  try {
+    const res  = await fetch("/api/keywords");
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    liveKeywords = data.keywords || [];
+    const t = data.rankingBaseDateTime ? fmtShort(data.rankingBaseDateTime) + " 기준" : "";
+    document.getElementById("liveRankingTime").textContent = t;
+    renderLiveBar();
+    if (liveKeywords.length)
+      await liveSelectKeyword(liveKeywords[0].keywordId, liveKeywords[0].keyword);
+  } catch(e) {
+    document.getElementById("liveKeywordBar").innerHTML =
+      `<div class="error">오류: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderLiveBar() {
+  document.getElementById("liveKeywordBar").innerHTML =
+    liveKeywords.map((k,i) => `
+      <button class="keyword-chip${k.keywordId===liveActiveId?" active":""}"
+              onclick="liveSelectKeyword(${k.keywordId},'${esc(k.keyword)}')">
+        <span class="rank">${i+1}</span>
+        <span>${esc(k.keyword)}</span>
+      </button>`).join("");
+}
+
+async function liveSelectKeyword(keywordId, keyword) {
+  if (liveActiveId === keywordId) return;
+  liveActiveId = keywordId;
+  renderLiveBar();
+  const sec = document.getElementById("liveEmotSection");
+  sec.innerHTML = `<div class="loading"><span class="spinner"></span>로딩 중...</div>`;
+  try {
+    const res  = await fetch(`/api/emoticons/${keywordId}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const kw = data.keyword || keyword;
+    sec.innerHTML = `
+      <div class="section-head">
+        <span class="section-kw">#${esc(kw)}</span>
+        <span class="section-count">${data.emots.length}개</span>
+      </div>
+      <div class="emot-grid">
+        ${data.emots.map(e=>`
+          <a class="emot-card" href="https://e.kakao.com/t/${esc(e.slug)}"
+             target="_blank" rel="noopener">
+            <img class="emot-img" src="${esc(e.imageUrl)}" alt="${esc(e.title)}" loading="lazy"/>
+            <div class="emot-title">${esc(e.title)}</div>
+          </a>`).join("")}
+      </div>`;
+    if (data.rankingBaseDateTime)
+      document.getElementById("liveRankingTime").textContent =
+        fmtShort(data.rankingBaseDateTime) + " 기준";
+  } catch(e) {
+    sec.innerHTML = `<div class="error">오류: ${esc(e.message)}</div>`;
+  }
+}
+
+async function liveRefresh() {
+  const btn = document.getElementById("refreshBtn");
+  btn.disabled = true; btn.textContent = "갱신 중...";
+  liveActiveId = null; liveKeywords = [];
+  document.getElementById("liveEmotSection").innerHTML =
+    `<div class="loading"><span class="spinner"></span></div>`;
+  await liveLoadKeywords();
+  btn.disabled = false; btn.textContent = "↺ 새로고침";
+}
+
+
+/* ════════ 기록 ════════ */
+let histSnapshots  = [];
+let histActiveSnap = null;
+let histActiveKwId = null;
+
+async function loadHistory() {
+  document.getElementById("snapshotList").innerHTML =
+    `<div class="loading"><span class="spinner"></span></div>`;
+  try {
+    const res  = await fetch("/api/snapshots");
+    const data = await res.json();
+    histSnapshots = Array.isArray(data) ? data : [];
+    renderSnapList();
+    const badge = document.getElementById("snapshotBadge");
+    document.getElementById("snapCount").textContent = histSnapshots.length + "개";
+    if (histSnapshots.length) {
+      badge.textContent = histSnapshots.length;
+      badge.style.display = "inline";
+    }
+    if (histSnapshots.length && !histActiveSnap)
+      selectSnapshot(histSnapshots[0]);
+  } catch(e) {
+    document.getElementById("snapshotList").innerHTML =
+      `<div class="error">오류: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderSnapList() {
+  const el = document.getElementById("snapshotList");
+  if (!histSnapshots.length) {
+    el.innerHTML = `<div class="empty-snap">아직 저장된 기록이 없어요.<br>서버가 시작되면 자동으로 수집되고<br>"지금 저장"으로 즉시 저장할 수 있어요.</div>`;
+    return;
+  }
+  el.innerHTML = histSnapshots.map(s => `
+    <div class="snap-item${histActiveSnap&&histActiveSnap.id===s.id?" active":""}"
+         onclick='selectSnapshot(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
+      <div class="snap-time">${fmtShort(s.ranking_base_dt)}</div>
+      <div class="snap-preview">
+        ${s.keywords.slice(0,6).map((k,i)=>`
+          <span class="preview-tag${i===0?" top":""}">${i+1} ${esc(k.keyword)}</span>
+        `).join("")}
+        ${s.keywords.length>6?`<span class="preview-tag">+${s.keywords.length-6}</span>`:""}
+      </div>
+    </div>`).join("");
+}
+
+function selectSnapshot(snap) {
+  histActiveSnap = snap;
+  histActiveKwId = null;
+  renderSnapList();
+  renderHistDetail();
+}
+
+function renderHistDetail() {
+  const snap = histActiveSnap;
+  if (!snap) return;
+  document.getElementById("histDetail").innerHTML = `
+    <div class="hist-detail-card">
+      <div class="hist-card-head">
+        <div class="hist-card-title">📊 ${fmtKST(snap.ranking_base_dt)} 기준</div>
+        <div class="hist-card-sub">${snap.keywords.length}개 키워드</div>
+      </div>
+      <div class="hist-kw-grid">
+        ${snap.keywords.map(k=>`
+          <div class="hist-kw-card${k.keywordId===histActiveKwId?" active":""}"
+               onclick="histSelectKeyword(${snap.id},${k.keywordId},'${esc(k.keyword)}',event)">
+            <div class="hist-kw-rank">${k.rank}</div>
+            <div class="hist-kw-name">${esc(k.keyword)}</div>
+          </div>`).join("")}
+      </div>
+      <div class="hist-emot-area" id="histEmotArea">
+        <div class="placeholder" style="padding:30px">키워드를 클릭하면 이모티콘을 볼 수 있어요</div>
+      </div>
+    </div>`;
+}
+
+async function histSelectKeyword(snapshotId, keywordId, keyword, e) {
+  histActiveKwId = keywordId;
+  document.querySelectorAll(".hist-kw-card").forEach(c=>c.classList.remove("active"));
+  e.currentTarget.classList.add("active");
+  const area = document.getElementById("histEmotArea");
+  area.innerHTML = `<div class="loading"><span class="spinner"></span>로딩 중...</div>`;
+  try {
+    const res  = await fetch(`/api/snapshots/${snapshotId}/emoticons/${keywordId}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const emots = data.emots;
+    if (!emots.length) {
+      area.innerHTML = `<div class="placeholder">이모티콘 데이터가 없어요</div>`;
+      return;
+    }
+    area.innerHTML = `
+      <div class="hist-emot-head">
+        #${esc(keyword)}
+        <span style="color:var(--muted);font-weight:400;font-size:13px">${emots.length}개</span>
+      </div>
+      <div class="hist-emot-grid">
+        ${emots.map(e=>`
+          <a class="emot-card" href="https://e.kakao.com/t/${esc(e.slug)}"
+             target="_blank" rel="noopener">
+            <img class="emot-img" src="${esc(e.image_url)}" alt="${esc(e.title)}" loading="lazy"/>
+            <div class="emot-title">${esc(e.title)}</div>
+          </a>`).join("")}
+      </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="error">오류: ${esc(e.message)}</div>`;
+  }
+}
+
+async function captureNow() {
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = "수집 중...";
+  try {
+    const res  = await fetch("/api/capture", { method:"POST" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.skipped) {
+      alert("이미 이 시간대의 데이터가 저장되어 있어요.");
+    } else {
+      histActiveSnap = null;
+      await loadHistory();
+    }
+  } catch(e) {
+    alert("오류: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "지금 저장";
+  }
+}
+
+
+/* ════════ 시간대별 분석 ════════ */
+let trendsLoaded = false;
+
+function chipClass(rank) {
+  if (rank <= 1) return "r1";
+  if (rank <= 2) return "r2";
+  if (rank <= 3) return "r3";
+  if (rank <= 6) return "r4";
+  return "rN";
+}
+
+async function loadTrends() {
+  if (trendsLoaded) return;
+  const body = document.getElementById("trendsBody");
+  body.innerHTML = `<div class="loading"><span class="spinner"></span>분석 중...</div>`;
+  try {
+    const res  = await fetch("/api/hourly-trends");
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    trendsLoaded = true;
+    renderTrends(data);
+  } catch(e) {
+    body.innerHTML = `<div class="error">오류: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderTrends(data) {
+  const body = document.getElementById("trendsBody");
+  const meta = document.getElementById("trendsMeta");
+
+  const snapCount = data.snapshot_count || 0;
+  const minDt = data.min_dt ? fmtShort(data.min_dt) : "-";
+  const maxDt = data.max_dt ? fmtShort(data.max_dt) : "-";
+  meta.innerHTML = `
+    <div>수집 횟수 <strong>${snapCount}</strong></div>
+    <div>기간 <strong>${minDt} ~ ${maxDt}</strong></div>`;
+
+  if (!data.hours || !data.hours.some(h => h.keywords.length)) {
+    body.innerHTML = `<div class="placeholder">아직 데이터가 없어요.<br>서버가 수집을 시작하면 결과가 표시됩니다.</div>`;
+    return;
+  }
+
+  const notice = snapCount < 24
+    ? `<div class="data-notice">💡 현재 <b>${snapCount}개</b> 기준입니다. 데이터가 쌓일수록 더 다양한 시간대 패턴을 볼 수 있어요.</div>`
+    : "";
+
+  const rows = data.hours.map(h => {
+    const label = String(h.hour).padStart(2, "0") + "시";
+    const hasData = h.keywords.length > 0;
+
+    const chips = hasData
+      ? h.keywords.map((k, i) => {
+          const rank  = Math.round(k.avg_rank);
+          const disp  = Number.isInteger(k.avg_rank) ? k.avg_rank : k.avg_rank.toFixed(1);
+          return `<span class="kw-chip ${chipClass(rank)}"
+                        title="${esc(k.name)} 평균 ${disp}위">
+                    <span class="cr">${disp}</span>${esc(k.name)}
+                  </span>`;
+        }).join("")
+      : `<span class="no-data-text">데이터 없음</span>`;
+
+    const countCell = hasData
+      ? `<td class="td-count">${h.snap_count}회</td>`
+      : `<td class="td-count" style="color:#ddd">—</td>`;
+
+    return `
+      <tr class="hour-row${hasData ? "" : " no-data"}">
+        <td class="td-hour">${label}</td>
+        ${countCell}
+        <td class="td-kws"><div class="kw-chips">${chips}</div></td>
+      </tr>`;
+  }).join("");
+
+  body.innerHTML = `
+    ${notice}
+    <div class="hour-table-wrap">
+      <table class="hour-table">
+        <thead>
+          <tr>
+            <th>시간대</th>
+            <th>수집</th>
+            <th class="th-kws">인기 키워드 (평균 순위 순)</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+
+/* ── 초기화 ── */
+liveLoadKeywords();
+
+setInterval(() => {
+  const msLeft = 600_000 - (Date.now() % 600_000);
+  if (msLeft < 8_000) liveRefresh();
+}, 30_000);
+</script>
+</body>
+</html>
