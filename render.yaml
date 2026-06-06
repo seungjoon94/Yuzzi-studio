@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: yujji-studio
+    runtime: python
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    envVars:
+      - key: DB_PATH
+        value: /data/kakao_trending.db
+      - key: PYTHON_VERSION
+        value: 3.12.0
+    disk:
+      name: yujji-data
+      mountPath: /data
+      sizeGB: 1
