@@ -773,7 +773,9 @@ async function liveLoadKeywords() {
     if (data.error) throw new Error(data.error);
     liveKeywords = data.keywords || [];
     const t = data.rankingBaseDateTime ? fmtShort(data.rankingBaseDateTime) + " 기준" : "";
-    document.getElementById("liveRankingTime").textContent = t;
+    const el = document.getElementById("liveRankingTime");
+    el.dataset.base = t;
+    el.textContent = t;
     renderLiveBar();
     if (liveKeywords.length)
       await liveSelectKeyword(liveKeywords[0].keywordId, liveKeywords[0].keyword);
@@ -1119,13 +1121,33 @@ function renderTrends(data) {
 }
 
 
+/* ── 자동 갱신 ── */
+function scheduleAutoRefresh() {
+  const msLeft = 600_000 - (Date.now() % 600_000);
+  setTimeout(async () => {
+    await liveRefresh();
+    scheduleAutoRefresh();
+  }, msLeft + 3000);
+}
+
+function updateCountdown() {
+  const el = document.getElementById("liveRankingTime");
+  if (!el) return;
+  const msLeft = 600_000 - (Date.now() % 600_000);
+  const totalSec = Math.ceil(msLeft / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  const countdown = min > 0
+    ? `${min}분 ${String(sec).padStart(2,"0")}초 후 업데이트`
+    : `${sec}초 후 업데이트`;
+  const base = el.dataset.base || "";
+  el.textContent = base ? `${base} · ${countdown}` : countdown;
+}
+
 /* ── 초기화 ── */
 liveLoadKeywords();
-
-setInterval(() => {
-  const msLeft = 600_000 - (Date.now() % 600_000);
-  if (msLeft < 8_000) liveRefresh();
-}, 30_000);
+scheduleAutoRefresh();
+setInterval(updateCountdown, 1000);
 </script>
 </body>
 </html>
