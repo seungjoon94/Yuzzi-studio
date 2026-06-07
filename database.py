@@ -1,12 +1,21 @@
 import os
 import psycopg2
 import psycopg2.extras
+from urllib.parse import urlparse
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    url = urlparse(DATABASE_URL)
+    return psycopg2.connect(
+        host=url.hostname,
+        port=url.port or 5432,
+        dbname=url.path.lstrip("/"),
+        user=url.username,
+        password=url.password,
+        sslmode="require",
+    )
 
 
 def init_db():
