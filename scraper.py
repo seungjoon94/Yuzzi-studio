@@ -50,12 +50,8 @@ def capture_and_save() -> dict:
     # 1. 키워드 목록 가져오기
     first = fetch_ranking(SEED_KEYWORD_ID, slot_ms)
     keywords: list = first.get("keywords", [])
-    ranking_base_dt: int = first.get("rankingBaseDateTime", slot_ms)
-
-    # 이미 반환된 ranking_base_dt가 다를 수 있음 (→ 진짜 슬롯)
-    if database.snapshot_exists(ranking_base_dt):
-        log.info("ranking_base_dt %s 이미 저장됨, 스킵", ranking_base_dt)
-        return {"skipped": True, "ranking_base_dt": ranking_base_dt}
+    # Kakao API 반환값은 KST 날짜가 달라질 수 있으므로 수집 시각 기준 slot_ms 사용
+    ranking_base_dt: int = slot_ms
 
     # 2. 키워드별 이모티콘 수집
     keyword_emots: dict[int, list] = {}
