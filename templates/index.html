@@ -1122,8 +1122,12 @@ function renderTrends(data) {
 
 
 /* ── 자동 갱신 ── */
+function msUntilNextUpdate() {
+  const elapsed = Date.now() % 3_600_000;
+  return elapsed < 300_000 ? 300_000 - elapsed : 3_900_000 - elapsed;
+}
+
 function scheduleAutoRefresh() {
-  const msLeft = 3_600_000 - (Date.now() % 3_600_000);
   setTimeout(async () => {
     await liveRefresh();
     try {
@@ -1134,14 +1138,13 @@ function scheduleAutoRefresh() {
       }
     } catch(e) {}
     scheduleAutoRefresh();
-  }, msLeft + 3000);
+  }, msUntilNextUpdate());
 }
 
 function updateCountdown() {
   const el = document.getElementById("liveRankingTime");
   if (!el) return;
-  const msLeft = 3_600_000 - (Date.now() % 3_600_000);
-  const totalSec = Math.ceil(msLeft / 1000);
+  const totalSec = Math.ceil(msUntilNextUpdate() / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   const countdown = min > 0

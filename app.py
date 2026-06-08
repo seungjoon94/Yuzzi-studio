@@ -108,11 +108,11 @@ def _scheduler():
         except Exception as e:
             log.error("스케줄 수집 오류: %s", e)
 
-        # 다음 정각까지 대기
+        # 다음 정각 +5분까지 대기
         now = time.time()
-        next_hour = (now // 3600 + 1) * 3600
+        next_hour = (now // 3600 + 1) * 3600 + 300
         sleep_secs = next_hour - now
-        log.info("다음 수집까지 %.0f초 (다음 정각)", sleep_secs)
+        log.info("다음 수집까지 %.0f초 (다음 정각 +5분)", sleep_secs)
         time.sleep(sleep_secs)
 
 
