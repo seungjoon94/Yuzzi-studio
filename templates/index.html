@@ -1123,9 +1123,16 @@ function renderTrends(data) {
 
 /* ── 자동 갱신 ── */
 function scheduleAutoRefresh() {
-  const msLeft = 600_000 - (Date.now() % 600_000);
+  const msLeft = 3_600_000 - (Date.now() % 3_600_000);
   setTimeout(async () => {
     await liveRefresh();
+    try {
+      await fetch("/api/capture", { method: "POST" });
+      histSnapshots = [];
+      if (document.getElementById("page-history").classList.contains("active")) {
+        await loadHistory();
+      }
+    } catch(e) {}
     scheduleAutoRefresh();
   }, msLeft + 3000);
 }
@@ -1133,7 +1140,7 @@ function scheduleAutoRefresh() {
 function updateCountdown() {
   const el = document.getElementById("liveRankingTime");
   if (!el) return;
-  const msLeft = 600_000 - (Date.now() % 600_000);
+  const msLeft = 3_600_000 - (Date.now() % 3_600_000);
   const totalSec = Math.ceil(msLeft / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;

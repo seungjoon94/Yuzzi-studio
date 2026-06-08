@@ -29,7 +29,7 @@ def api_keywords():
         data = scraper.fetch_ranking(scraper.SEED_KEYWORD_ID)
         return jsonify({
             "keywords": data.get("keywords", []),
-            "rankingBaseDateTime": data.get("rankingBaseDateTime", 0),
+            "rankingBaseDateTime": scraper.current_slot_ms(),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -46,7 +46,7 @@ def api_emoticons(keyword_id: int):
         return jsonify({
             "emots": data.get("emots", []),
             "keyword": kw_name,
-            "rankingBaseDateTime": data.get("rankingBaseDateTime", 0),
+            "rankingBaseDateTime": scraper.current_slot_ms(),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
