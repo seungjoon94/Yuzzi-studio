@@ -24,10 +24,11 @@ def current_slot_ms() -> int:
     return (int(time.time() * 1000) // 600_000) * 600_000
 
 
-def fetch_ranking(keyword_id: int) -> dict:
+def fetch_ranking(keyword_id: int, slot_ms: int | None = None) -> dict:
     resp = requests.get(
         KAKAO_API,
-        params={"keywordId": keyword_id},
+        params={"keywordId": keyword_id,
+                "rankingBaseDateTime": slot_ms or current_slot_ms()},
         headers=HEADERS,
         timeout=10,
     )
@@ -46,8 +47,8 @@ def capture_and_save() -> dict:
 
     log.info("수집 시작: slot=%s", slot_ms)
 
-    # 1. 키워드 목록 가져오기 (rankingBaseDateTime 미지정 → 카카오 최신 데이터 반환)
-    first = fetch_ranking(SEED_KEYWORD_ID)
+    # 1. 키워드 목록 가져오기
+    first = fetch_ranking(SEED_KEYWORD_ID, slot_ms)
     keywords: list = first.get("keywords", [])
     ranking_base_dt: int = slot_ms
 
@@ -62,7 +63,7 @@ def capture_and_save() -> dict:
         if kid in keyword_emots:
             continue
         try:
-            data = fetch_ranking(kid)
+            data = fetch_ranking(kid, slot_ms)
             keyword_emots[kid] = data.get("emots", [])
             time.sleep(0.3)
         except Exception as e:
