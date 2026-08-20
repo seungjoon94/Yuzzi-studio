@@ -122,37 +122,56 @@ def save_snapshot(captured_at: str, ranking_base_dt: int,
 
 
 def get_snapshots(limit: int = 200) -> list[dict]:
+    """최신 스냅샷과 각 스냅샷의 키워드를 한 번의 쿼리로 가져온다.
+
+    스냅샷마다 키워드를 따로 조회하면 왕복이 limit+1회가 되어, 스냅샷이
+    쌓일수록 느려지다 결국 타임아웃으로 죽는다(1,755건 시점에 31초/500).
+    LEFT JOIN으로 한 번에 받아 파이썬에서 묶는다.
+
+    LEFT JOIN이라 키워드가 없는 스냅샷도 빈 목록으로 남는다 — 기존 동작과 같다.
+    정렬은 쿼리가 보장하므로(스냅샷 최신순, 그 안에서 rank순) 여기서 다시
+    정렬하지 않는다.
+    """
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        """SELECT id, captured_at, ranking_base_dt
-           FROM snapshots ORDER BY ranking_base_dt DESC LIMIT %s""",
+        """WITH recent AS (
+               SELECT id, captured_at, ranking_base_dt
+               FROM snapshots
+               ORDER BY ranking_base_dt DESC
+               LIMIT %s
+           )
+           SELECT r.id, r.captured_at, r.ranking_base_dt,
+                  sk.keyword_id, sk.keyword_name, sk.rank
+           FROM recent r
+           LEFT JOIN snapshot_keywords sk ON sk.snapshot_id = r.id
+           ORDER BY r.ranking_base_dt DESC, sk.rank""",
         (limit,),
     )
     rows = cur.fetchall()
-
-    result = []
-    for r in rows:
-        cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur2.execute(
-            """SELECT keyword_id, keyword_name, rank
-               FROM snapshot_keywords WHERE snapshot_id = %s ORDER BY rank""",
-            (r["id"],),
-        )
-        kws = cur2.fetchall()
-        cur2.close()
-        result.append({
-            "id": r["id"],
-            "captured_at": r["captured_at"],
-            "ranking_base_dt": r["ranking_base_dt"],
-            "keywords": [
-                {"keywordId": k["keyword_id"], "keyword": k["keyword_name"], "rank": k["rank"]}
-                for k in kws
-            ],
-        })
-
     cur.close()
     conn.close()
+
+    result: list[dict] = []
+    by_id: dict = {}
+    for row in rows:
+        snap = by_id.get(row["id"])
+        if snap is None:
+            snap = {
+                "id":              row["id"],
+                "captured_at":     row["captured_at"],
+                "ranking_base_dt": row["ranking_base_dt"],
+                "keywords":        [],
+            }
+            by_id[row["id"]] = snap
+            result.append(snap)
+        if row["keyword_id"] is not None:
+            snap["keywords"].append({
+                "keywordId": row["keyword_id"],
+                "keyword":   row["keyword_name"],
+                "rank":      row["rank"],
+            })
+
     return result
 
 
