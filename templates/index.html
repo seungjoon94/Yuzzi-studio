@@ -746,6 +746,91 @@
     .tts-gate .tts-card { padding: 26px 22px; }
     .tts-gate-icon { font-size: 30px; margin-bottom: 10px; }
 
+    /* 탭 (복제 / 프리셋 찾기) */
+    .tts-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 3px;
+      margin-bottom: 14px;
+    }
+    .tts-tab {
+      flex: 1;
+      text-align: center;
+      padding: 7px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #777;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .tts-tab:hover { color: #333; }
+    .tts-tab.active {
+      background: var(--card);
+      color: #222;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+
+    /* 추천 후보 카드 */
+    .tts-cand {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 11px;
+      margin-bottom: 8px;
+    }
+    .tts-cand-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .tts-cand-name {
+      font-size: 13px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tts-cand-score {
+      font-size: 10.5px; color: var(--muted);
+      font-variant-numeric: tabular-nums; flex-shrink: 0;
+    }
+    .tts-score-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 6px 0 8px;
+    }
+    .tts-score-bar span {
+      display: block; height: 100%;
+      background: var(--yellow-dark);
+    }
+    .tts-cand-tags {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-bottom: 9px;
+    }
+    .tts-tag {
+      font-size: 9.5px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: #667;
+      white-space: nowrap;
+    }
+    .tts-cand-actions { display: flex; gap: 6px; }
+    .tts-btn-sm {
+      flex: 1;
+      padding: 5px 8px;
+      font-size: 11.5px;
+      border-radius: 7px;
+    }
+    .tts-demo-player { margin-top: 10px; }
+    .tts-demo-player audio { width: 100%; }
+
     /* 공통 상태 */
     .loading {
       padding: 50px;
@@ -915,7 +1000,18 @@
       <!-- 왼쪽: 등록 + 목록 -->
       <div>
         <div class="tts-card">
-          <div class="tts-card-title">목소리 등록</div>
+          <div class="tts-card-title">목소리 추가</div>
+
+          <div class="tts-tabs">
+            <div class="tts-tab active" data-mode="clone"
+                 onclick="ttsSwitchMode('clone')">내 목소리 복제</div>
+            <div class="tts-tab" data-mode="preset"
+                 onclick="ttsSwitchMode('preset')">프리셋 찾기</div>
+          </div>
+
+          <!-- 모드 1: 내 목소리 복제 -->
+          <div id="ttsModeClone">
+
           <div class="tts-card-sub" id="ttsSampleHint">샘플을 녹음하거나 파일을 올리세요.</div>
 
           <div class="tts-field">
@@ -942,6 +1038,41 @@
           <button class="btn btn-yellow" style="width:100%" id="ttsCloneBtn"
                   onclick="ttsClone()" disabled>목소리 만들기</button>
           <div id="ttsCloneMsg"></div>
+
+          </div><!-- /ttsModeClone -->
+
+          <!-- 모드 2: 프리셋 찾기 -->
+          <div id="ttsModePreset" style="display:none">
+
+            <div class="tts-card-sub">
+              원하는 목소리를 말로 설명하면 Typecast 프리셋 중에서 찾아줍니다.
+              들어보고 마음에 들면 목록에 담으세요.
+            </div>
+
+            <div class="tts-field">
+              <label class="tts-label" for="ttsQuery">어떤 목소리를 원하세요?</label>
+              <textarea class="tts-textarea" id="ttsQuery" maxlength="500"
+                        style="min-height:70px"
+                        placeholder="예: 이모티콘 소개 쇼츠에 어울리는 밝고 발랄한 20대 여성 목소리"
+                        onkeydown="if(event.key==='Enter'&amp;&amp;(event.ctrlKey||event.metaKey))ttsSearchVoices()"></textarea>
+            </div>
+
+            <div class="tts-field">
+              <label class="tts-label" for="ttsDemoPreset">미리듣기 문장</label>
+              <select class="tts-select" id="ttsDemoPreset"
+                      onchange="ttsOnDemoPresetChange()"></select>
+              <textarea class="tts-textarea" id="ttsDemoText" maxlength="200"
+                        style="min-height:60px;margin-top:6px"></textarea>
+            </div>
+
+            <button class="btn btn-yellow" style="width:100%" id="ttsSearchBtn"
+                    onclick="ttsSearchVoices()">목소리 찾기</button>
+
+            <div class="tts-demo-player" id="ttsDemoPlayer"></div>
+            <div id="ttsPresetMsg"></div>
+            <div id="ttsCandidates" style="margin-top:12px"></div>
+
+          </div><!-- /ttsModePreset -->
         </div>
 
         <div class="tts-card">
@@ -1433,6 +1564,8 @@ const ttsState = {
   selectedId: null,
   loggedIn:  false,
   lastUrl:   null,
+  candidates: [],
+  demoUrl:   null,
 };
 
 function ttsHeaders(extra) {
@@ -1519,6 +1652,14 @@ function ttsRenderProviders() {
   const req = ttsState.sampleReq;
   hint.textContent =
     `wav 또는 mp3, ${req.min_sec}~${req.max_sec}초. 조용한 곳에서 또박또박 읽어주세요.`;
+
+  // 프리셋 찾기는 Typecast 전용 기능이다
+  const hasTypecast = ttsState.providers.some(p => p.name === "typecast");
+  const presetTab = document.querySelector('.tts-tab[data-mode="preset"]');
+  if (presetTab) presetTab.style.display = hasTypecast ? "" : "none";
+  if (!hasTypecast) ttsSwitchMode("clone");
+  else ttsRenderDemoTexts();
+
   ttsRenderOptions();
 }
 
@@ -1899,6 +2040,205 @@ async function ttsSpeak() {
   } finally {
     btn.textContent = "음성 생성";
     ttsUpdateCount();
+  }
+}
+
+
+/* ════════ 프리셋 목소리 찾기 ════════ */
+
+// LLM 없이 쓰는 큐레이션 문장. 마지막 항목은 발음 품질 확인용이다.
+const TTS_DEMO_TEXTS = [
+  { label: "기본 인사",     text: "안녕하세요, 유찌 스튜디오입니다. 오늘도 좋은 하루 보내세요." },
+  { label: "이모티콘 소개", text: "이번 주 가장 인기 있는 이모티콘을 소개해 드릴게요. 귀여운 토끼 캐릭터가 １위를 차지했습니다." },
+  { label: "차분한 나레이션", text: "화면에 보이는 순위는 매시간 자동으로 갱신됩니다. 시간대별 흐름도 함께 확인해 보세요." },
+  { label: "밝은 홍보",     text: "지금 바로 확인해 보세요! 놓치면 후회할 특별한 소식이 준비되어 있습니다." },
+  { label: "발음 점검",     text: "간장 공장 공장장은 강 공장장이고, 된장 공장 공장장은 장 공장장이다." },
+];
+
+const TTS_GENDER_KO = { male: "남성", female: "여성" };
+const TTS_AGE_KO = {
+  child: "아동", teenager: "청소년", young_adult: "청년",
+  middle_age: "중년", elder: "노년",
+};
+
+function ttsSwitchMode(mode) {
+  document.querySelectorAll(".tts-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.mode === mode));
+  const clone  = document.getElementById("ttsModeClone");
+  const preset = document.getElementById("ttsModePreset");
+  if (clone)  clone.style.display  = mode === "clone"  ? "" : "none";
+  if (preset) preset.style.display = mode === "preset" ? "" : "none";
+}
+
+/* ── 미리듣기 문장 ── */
+
+function ttsRenderDemoTexts() {
+  const sel = document.getElementById("ttsDemoPreset");
+  if (!sel || sel.options.length) return;   // 한 번만 채운다
+  sel.innerHTML =
+    TTS_DEMO_TEXTS.map((d, i) => `<option value="${i}">${esc(d.label)}</option>`).join("")
+    + `<option value="custom">직접 입력</option>`;
+  ttsOnDemoPresetChange();
+}
+
+function ttsOnDemoPresetChange() {
+  const sel = document.getElementById("ttsDemoPreset");
+  const ta  = document.getElementById("ttsDemoText");
+  if (!sel || !ta) return;
+  if (sel.value === "custom") {
+    ta.value = "";
+    ta.placeholder = "미리듣기에 쓸 문장을 입력하세요 (최대 200자)";
+    ta.focus();
+  } else {
+    const d = TTS_DEMO_TEXTS[Number(sel.value)];
+    ta.value = d ? d.text : "";
+  }
+}
+
+function ttsDemoText() {
+  const ta = document.getElementById("ttsDemoText");
+  return ta ? ta.value.trim().slice(0, 200) : "";
+}
+
+/* ── 추천 검색 ── */
+
+async function ttsSearchVoices() {
+  const q = document.getElementById("ttsQuery").value.trim();
+  if (!q) { ttsMsg("ttsPresetMsg", "err", "원하는 목소리를 설명해 주세요."); return; }
+
+  const btn = document.getElementById("ttsSearchBtn");
+  const box = document.getElementById("ttsCandidates");
+  btn.disabled    = true;
+  btn.textContent = "찾는 중...";
+  ttsMsg("ttsPresetMsg", "", "");
+  box.innerHTML = `<div class="loading"><span class="spinner"></span></div>`;
+
+  try {
+    const res = await fetch(
+      "/api/tts/recommend?count=5&q=" + encodeURIComponent(q),
+      { headers: ttsHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "추천 실패");
+    ttsState.candidates = Array.isArray(data) ? data : [];
+    ttsRenderCandidates();
+  } catch (e) {
+    box.innerHTML = "";
+    ttsMsg("ttsPresetMsg", "err", e.message);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "목소리 찾기";
+  }
+}
+
+function ttsRenderCandidates() {
+  const box  = document.getElementById("ttsCandidates");
+  const list = ttsState.candidates || [];
+  if (!list.length) {
+    box.innerHTML =
+      `<div class="tts-card-sub" style="margin:0">조건에 맞는 목소리를 찾지 못했습니다. 설명을 바꿔서 다시 시도해 보세요.</div>`;
+    return;
+  }
+
+  box.innerHTML = list.map((v, i) => {
+    const score = Number(v.score);
+    const pct   = Math.round(Math.max(0, Math.min(1, isNaN(score) ? 0 : score)) * 100);
+    const tags  = [];
+    if (v.gender) tags.push(TTS_GENDER_KO[v.gender] || v.gender);
+    if (v.age)    tags.push(TTS_AGE_KO[v.age] || v.age);
+    (v.use_cases || []).slice(0, 2).forEach(u => tags.push(u));
+
+    const emos = v.emotions || [];
+    const emoTag = emos.length
+      ? `<span class="tts-tag" title="${esc(emos.join(", "))}">감정 ${emos.length}종</span>`
+      : "";
+
+    return `
+      <div class="tts-cand">
+        <div class="tts-cand-head">
+          <span class="tts-cand-name">${esc(v.voice_name || v.voice_id)}</span>
+          <span class="tts-cand-score">${pct}%</span>
+        </div>
+        <div class="tts-score-bar"><span style="width:${pct}%"></span></div>
+        <div class="tts-cand-tags">
+          ${tags.map(t => `<span class="tts-tag">${esc(t)}</span>`).join("")}
+          ${emoTag}
+        </div>
+        <div class="tts-cand-actions">
+          <button class="btn tts-btn-sm" id="ttsDemoBtn${i}"
+                  onclick="ttsPlayDemo(${i})">▶ 들어보기</button>
+          <button class="btn tts-btn-sm btn-yellow"
+                  onclick="ttsSavePreset(${i})">+ 담기</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+/* ── 미리듣기 ── */
+
+async function ttsPlayDemo(idx) {
+  const v = (ttsState.candidates || [])[idx];
+  if (!v) return;
+
+  const text = ttsDemoText();
+  if (!text) { ttsMsg("ttsPresetMsg", "err", "미리듣기 문장을 입력해 주세요."); return; }
+
+  const btn = document.getElementById("ttsDemoBtn" + idx);
+  if (btn) { btn.disabled = true; btn.textContent = "생성 중..."; }
+  ttsMsg("ttsPresetMsg", "", "");
+
+  try {
+    const res = await fetch("/api/tts/demo", {
+      method:  "POST",
+      headers: ttsHeaders({ "Content-Type": "application/json" }),
+      body:    JSON.stringify({ voice_id: v.voice_id, text: text }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || `미리듣기 실패 (HTTP ${res.status})`);
+    }
+
+    const blob = await res.blob();
+    if (ttsState.demoUrl) URL.revokeObjectURL(ttsState.demoUrl);
+    ttsState.demoUrl = URL.createObjectURL(blob);
+
+    document.getElementById("ttsDemoPlayer").innerHTML = `
+      <audio controls autoplay src="${ttsState.demoUrl}"></audio>
+      <div class="tts-cand-tags" style="margin-top:4px">
+        <span class="tts-tag">${esc(v.voice_name || v.voice_id)}</span>
+      </div>`;
+  } catch (e) {
+    ttsMsg("ttsPresetMsg", "err", e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "▶ 들어보기"; }
+  }
+}
+
+/* ── 목록에 담기 ── */
+
+async function ttsSavePreset(idx) {
+  const v = (ttsState.candidates || [])[idx];
+  if (!v) return;
+
+  const entered = prompt("목록에 담을 이름을 정해주세요.", v.voice_name || v.voice_id);
+  if (entered === null) return;
+  const label = entered.trim();
+  if (!label) { ttsMsg("ttsPresetMsg", "err", "이름을 입력해 주세요."); return; }
+
+  try {
+    const res = await fetch("/api/tts/voices/preset", {
+      method:  "POST",
+      headers: ttsHeaders({ "Content-Type": "application/json" }),
+      body:    JSON.stringify({ voice_id: v.voice_id, label: label }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "저장 실패");
+
+    await ttsLoadVoices();
+    ttsSelectVoice(data.id);
+    ttsMsg("ttsPresetMsg", "ok",
+           `"${data.label}" 을(를) 목록에 담았습니다. 오른쪽에서 바로 쓸 수 있어요.`);
+  } catch (e) {
+    ttsMsg("ttsPresetMsg", "err", e.message);
   }
 }
 

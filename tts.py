@@ -13,6 +13,7 @@ ElevenLabs와 Typecast를 같은 인터페이스로 감싼다.
 """
 import logging
 import os
+import time
 
 import requests
 
@@ -40,6 +41,9 @@ TYPECAST_LANG  = "kor"                     # ISO 639-3
 TYPECAST_MAX   = 2_000                     # API 하드 리밋
 TYPECAST_EMOTIONS = ("normal", "happy", "sad", "angry",
                      "whisper", "toneup", "tonedown")
+TYPECAST_QUERY_MAX = 500          # 추천 query 길이 상한
+TYPECAST_REC_MAX   = 10           # 추천 개수 상한
+VOICE_CACHE_TTL    = 6 * 3600     # 목소리 카탈로그 캐시 수명(초)
 
 # 클로닝 샘플 제약 — 둘 중 더 엄격한 Typecast 기준(5~150초, 25MB, wav/mp3)
 SAMPLE_MAX_BYTES = 25 * 1024 * 1024
@@ -99,6 +103,16 @@ def _post(label, *args, **kwargs):
     """requests.post를 감싸 네트워크 예외를 TTSError로 통일한다."""
     try:
         return requests.post(*args, **kwargs)
+    except requests.Timeout:
+        raise TTSError(label + " 응답이 시간 내에 오지 않았습니다. 다시 시도해 주세요.")
+    except requests.RequestException as e:
+        raise TTSError("{} 연결 실패: {}".format(label, e))
+
+
+def _http_get(label, url, headers, params=None, timeout=TIMEOUT_MISC):
+    """requests.get을 감싸 네트워크 예외를 TTSError로 통일한다."""
+    try:
+        return requests.get(url, headers=headers, params=params, timeout=timeout)
     except requests.Timeout:
         raise TTSError(label + " 응답이 시간 내에 오지 않았습니다. 다시 시도해 주세요.")
     except requests.RequestException as e:
@@ -231,6 +245,104 @@ def _typecast_delete(voice_id):
         {"X-API-KEY": _typecast_key()},
         ok_codes=(200, 204),
     )
+
+
+# ── Typecast 프리셋 목소리 탐색 ─────────────────────────────────────────────
+# 자연어 설명 → 목소리 추천은 Typecast가 자체 엔드포인트로 제공한다(LLM 불필요).
+
+_voice_cache = {"at": 0.0, "data": {}}
+
+
+def _typecast_require():
+    key = _typecast_key()
+    if not key:
+        raise TTSError("Typecast API 키가 서버에 설정되지 않았습니다.")
+    return key
+
+
+def voice_catalog(force=False):
+    """voice_id → 메타데이터 맵. 700여 건이라 한 번 받아 캐시한다."""
+    now = time.time()
+    if not force and _voice_cache["data"] and now - _voice_cache["at"] < VOICE_CACHE_TTL:
+        return _voice_cache["data"]
+
+    resp = _http_get(
+        "Typecast",
+        TYPECAST_API + "/v2/voices",
+        {"X-API-KEY": _typecast_require()},
+        params={"model": TYPECAST_MODEL},
+        timeout=TIMEOUT_SPEAK,
+    )
+    if resp.status_code != 200:
+        _fail("Typecast", resp)
+
+    data = resp.json()
+    if not isinstance(data, list):
+        raise TTSError("Typecast 목소리 목록 응답 형식이 예상과 다릅니다.")
+
+    catalog = {v["voice_id"]: v for v in data if isinstance(v, dict) and v.get("voice_id")}
+    _voice_cache["data"] = catalog
+    _voice_cache["at"] = now
+    log.info("Typecast 목소리 카탈로그 갱신: %d건", len(catalog))
+    return catalog
+
+
+def _emotions_for(meta):
+    """이 목소리가 현재 엔진(ssfm-v30)에서 지원하는 감정 목록."""
+    for m in meta.get("models") or []:
+        if m.get("version") == TYPECAST_MODEL:
+            return list(m.get("emotions") or [])
+    return []
+
+
+def recommend_voices(query, count=5):
+    """자연어 설명으로 프리셋 목소리를 추천받고 메타데이터를 붙여 반환."""
+    key = _typecast_require()
+    query = (query or "").strip()
+    if not query:
+        raise TTSError("찾고 싶은 목소리를 설명해 주세요.")
+
+    resp = _http_get(
+        "Typecast",
+        TYPECAST_API + "/v1/voices/recommendations",
+        {"X-API-KEY": key},
+        params={
+            "query": query[:TYPECAST_QUERY_MAX],
+            "count": int(_clamp(count, 1, TYPECAST_REC_MAX, 5)),
+        },
+        timeout=TIMEOUT_SPEAK,
+    )
+    if resp.status_code != 200:
+        _fail("Typecast", resp)
+
+    data = resp.json()
+    if not isinstance(data, list):
+        raise TTSError("Typecast 추천 응답 형식이 예상과 다릅니다.")
+
+    # 카탈로그 조회가 실패해도 추천 자체는 살린다
+    try:
+        catalog = voice_catalog()
+    except TTSError as e:
+        log.warning("카탈로그 조회 실패, 메타데이터 없이 반환: %s", e)
+        catalog = {}
+
+    out = []
+    for v in data:
+        if not isinstance(v, dict) or not v.get("voice_id"):
+            continue
+        meta = catalog.get(v["voice_id"]) or {}
+        out.append({
+            "voice_id":  v["voice_id"],
+            "voice_name": v.get("voice_name") or meta.get("voice_name") or "",
+            "score":     v.get("score"),
+            "gender":    meta.get("gender"),
+            "age":       meta.get("age"),
+            "use_cases": list(meta.get("use_cases") or [])[:3],
+            "emotions":  _emotions_for(meta),
+        })
+
+    log.info("프리셋 추천: query=%r → %d건", query[:60], len(out))
+    return out
 
 
 # ── 제공자 레지스트리 ───────────────────────────────────────────────────────

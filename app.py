@@ -96,6 +96,7 @@ def api_capture():
 #   TTS_USERS="승준:패스코드1,동료:패스코드2"
 
 TTS_MAX_CHARS = int(os.environ.get("TTS_MAX_CHARS", "1000"))
+TTS_DEMO_MAX_CHARS = 200   # 미리듣기는 짧게 — 호출 낭비를 막는다
 
 
 def _tts_users() -> dict:
@@ -297,6 +298,95 @@ def api_tts_speak():
         "Cache-Control": "no-store",
         "Content-Length": str(len(audio)),
     })
+
+
+# ── 프리셋 목소리 탐색 ──────────────────────────────────────────────────────
+# 설명 → 추천 → 미리듣기 → 목록에 담기. 추천은 Typecast 네이티브 기능이다.
+
+@app.route("/api/tts/recommend")
+def api_tts_recommend():
+    owner, err = _tts_guard()
+    if err:
+        return err
+
+    query = (request.args.get("q") or "").strip()
+    if not query:
+        return jsonify({"error": "찾고 싶은 목소리를 설명해 주세요."}), 400
+
+    try:
+        count = int(request.args.get("count", 5))
+    except (TypeError, ValueError):
+        count = 5
+
+    try:
+        return jsonify(tts.recommend_voices(query, count))
+    except tts.TTSError as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/tts/demo", methods=["POST"])
+def api_tts_demo():
+    """목록에 담기 전에 프리셋 목소리를 미리 들어본다."""
+    owner, err = _tts_guard()
+    if err:
+        return err
+
+    body     = request.get_json(silent=True) or {}
+    voice_id = (body.get("voice_id") or "").strip()
+    text     = (body.get("text") or "").strip()
+
+    if not voice_id.startswith(("tc_", "uc_")):
+        return jsonify({"error": "올바른 Typecast 목소리 ID가 아닙니다."}), 400
+    if not text:
+        return jsonify({"error": "미리듣기 문장을 입력해 주세요."}), 400
+    if len(text) > TTS_DEMO_MAX_CHARS:
+        return jsonify({
+            "error": "미리듣기 문장은 {}자까지입니다 (현재 {}자).".format(
+                TTS_DEMO_MAX_CHARS, len(text))
+        }), 400
+
+    opts = {
+        "speed":     body.get("speed"),
+        "emotion":   body.get("emotion"),
+        "intensity": body.get("intensity"),
+    }
+    try:
+        audio = tts.speak("typecast", voice_id, text, opts)
+    except tts.TTSError as e:
+        return jsonify({"error": str(e)}), 502
+
+    log.info("미리듣기: owner=%s voice_id=%s chars=%d", owner, voice_id, len(text))
+    return Response(audio, mimetype="audio/mpeg", headers={
+        "Cache-Control": "no-store",
+        "Content-Length": str(len(audio)),
+    })
+
+
+@app.route("/api/tts/voices/preset", methods=["POST"])
+def api_tts_save_preset():
+    """추천으로 찾은 프리셋 목소리를 목록에 담는다(복제가 아니라 참조만 저장)."""
+    owner, err = _tts_guard()
+    if err:
+        return err
+
+    body     = request.get_json(silent=True) or {}
+    voice_id = (body.get("voice_id") or "").strip()
+    label    = (body.get("label") or "").strip()
+
+    if not voice_id.startswith("tc_"):
+        return jsonify({"error": "프리셋 목소리 ID(tc_)가 아닙니다."}), 400
+    if not label:
+        return jsonify({"error": "이름을 입력해 주세요."}), 400
+
+    try:
+        row_id = database.add_tts_voice(
+            "typecast", voice_id, label[:60], owner, datetime.now(KST).isoformat()
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"id": row_id, "provider": "typecast", "voice_id": voice_id,
+                    "label": label[:60], "owner": owner, "preset": True})
 
 
 # ── 페이지 ──────────────────────────────────────────────────────────────────
