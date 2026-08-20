@@ -99,12 +99,23 @@ TTS_MAX_CHARS = int(os.environ.get("TTS_MAX_CHARS", "1000"))
 
 
 def _tts_users() -> dict:
-    """패스코드 → 소유자 이름 매핑."""
+    """패스코드 → 소유자 이름 매핑.
+
+    형식은 "이름:패스코드"를 쉼표로 이어 붙인 것.
+    콜론 없이 패스코드만 적으면 둘이 공유하는 패스코드로 보고 소유자를 "공용"으로 둔다.
+    패스코드에 콜론이 들어가도 첫 콜론에서만 쪼개므로 그대로 살아남는다.
+    """
     raw = os.environ.get("TTS_USERS", "").strip()
     users = {}
     for pair in raw.split(","):
-        name, _, code = pair.partition(":")
-        name, code = name.strip(), code.strip()
+        pair = pair.strip()
+        if not pair:
+            continue
+        if ":" in pair:
+            name, _, code = pair.partition(":")
+            name, code = name.strip(), code.strip()
+        else:
+            name, code = "공용", pair
         if name and code:
             users[code] = name
     return users
@@ -127,7 +138,8 @@ def _tts_owner():
 def _tts_guard():
     """(소유자, 오류응답) 튜플. 오류응답이 None이 아니면 그걸 그대로 반환한다."""
     if not _tts_users():
-        return None, (jsonify({"error": "서버에 TTS_USERS가 설정되지 않아 기능이 닫혀 있습니다."}), 503)
+        return None, (jsonify({"error": "서버에 TTS_USERS가 설정되지 않았거나 형식이 잘못돼 기능이 닫혀 있습니다."
+                             " 형식: 패스코드 또는 이름:패스코드(쉼표로 여러 개)."}), 503)
     owner = _tts_owner()
     if owner is None:
         return None, (jsonify({"error": "패스코드가 올바르지 않습니다."}), 401)
