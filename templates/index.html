@@ -831,6 +831,27 @@
     .tts-demo-player { margin-top: 10px; }
     .tts-demo-player audio { width: 100%; }
 
+    /* 요금제 배지 */
+    .tts-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .tts-plan {
+      font-size: 11.5px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 4px 11px;
+      color: #556;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .tts-plan .tts-plan-name {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      margin-right: 5px;
+    }
+    .tts-plan.low  { background: #fff6e0; border-color: #f0dca8; color: #8a6100; }
+    .tts-plan.out  { background: #fdecea; border-color: #f3c4be; color: #c0392b; }
+
     /* 공통 상태 */
     .loading {
       padding: 50px;
@@ -974,7 +995,10 @@
         <div class="tts-topbar-title">나만의 TTS</div>
         <div class="tts-topbar-sub">내 목소리를 복제해서 텍스트를 읽게 만듭니다</div>
       </div>
-      <div class="tts-owner" id="ttsOwner" style="display:none"></div>
+      <div class="tts-badges">
+        <div class="tts-plan" id="ttsPlan" style="display:none"></div>
+        <div class="tts-owner" id="ttsOwner" style="display:none"></div>
+      </div>
     </div>
 
     <!-- 패스코드 게이트 -->
@@ -1011,6 +1035,8 @@
 
           <!-- 모드 1: 내 목소리 복제 -->
           <div id="ttsModeClone">
+
+          <div id="ttsSlotWarn"></div>
 
           <div class="tts-card-sub" id="ttsSampleHint">샘플을 녹음하거나 파일을 올리세요.</div>
 
@@ -1566,6 +1592,7 @@ const ttsState = {
   lastUrl:   null,
   candidates: [],
   demoUrl:   null,
+  plan:      null,
 };
 
 function ttsHeaders(extra) {
@@ -1621,6 +1648,7 @@ async function ttsTryLogin(code, silent) {
 
     ttsRenderProviders();
     await ttsLoadVoices();
+    ttsLoadPlan();          // 부가 정보 — 기다리지 않는다
     return true;
   } catch (e) {
     if (!silent) ttsMsg("ttsGateMsg", "err", e.message);
@@ -2040,6 +2068,7 @@ async function ttsSpeak() {
   } finally {
     btn.textContent = "음성 생성";
     ttsUpdateCount();
+    ttsLoadPlan();          // 크레딧이 줄었으니 배지 갱신
   }
 }
 
@@ -2210,6 +2239,7 @@ async function ttsPlayDemo(idx) {
     ttsMsg("ttsPresetMsg", "err", e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "▶ 들어보기"; }
+    ttsLoadPlan();          // 크레딧이 줄었으니 배지 갱신
   }
 }
 
@@ -2242,6 +2272,71 @@ async function ttsSavePreset(idx) {
   }
 }
 
+
+/* ════════ 요금제 / 크레딧 ════════ */
+
+const TTS_PLAN_KO = { free: "FREE", lite: "LITE", plus: "PLUS", custom: "CUSTOM" };
+
+function ttsFmtCredits(n) {
+  if (typeof n !== "number" || isNaN(n)) return "?";
+  if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 ? 2 : 0) + "M";
+  if (n >= 1000)    return (n / 1000).toFixed(n % 1000 ? 1 : 0) + "k";
+  return String(n);
+}
+
+/** 요금제 배지 갱신. 실패해도 조용히 넘어간다(부가 정보이므로). */
+async function ttsLoadPlan() {
+  const el = document.getElementById("ttsPlan");
+  if (!el) return;
+  try {
+    const res  = await fetch("/api/tts/plan", { headers: ttsHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "요금제 조회 실패");
+
+    ttsState.plan = data;
+    const rem   = data.remaining_credits;
+    const total = data.plan_credits;
+    const name  = TTS_PLAN_KO[data.plan] || (data.plan || "?").toUpperCase();
+
+    let cls = "tts-plan";
+    if (typeof rem === "number") {
+      if (rem <= 0) cls += " out";
+      else if (typeof total === "number" && total > 0 && rem / total < 0.1) cls += " low";
+    }
+    el.className = cls;
+
+    const slot = data.custom_voice_slot;
+    const parts = [];
+    if (typeof rem === "number" && typeof total === "number")
+      parts.push(`크레딧 ${ttsFmtCredits(rem)} / ${ttsFmtCredits(total)}`);
+    if (typeof slot === "number") parts.push(`복제 슬롯 ${slot}`);
+
+    el.innerHTML = `<span class="tts-plan-name">${esc(name)}</span>${esc(parts.join(" · "))}`;
+    el.style.display = "";
+    el.title = "크레딧은 1자 = 1크레딧입니다.";
+
+    ttsRenderSlotWarning();
+  } catch (e) {
+    el.style.display = "none";
+  }
+}
+
+/** 복제 슬롯이 없으면 복제 탭에 미리 알려준다 — 녹음하고 403 맞는 걸 막는다. */
+function ttsRenderSlotWarning() {
+  const box = document.getElementById("ttsSlotWarn");
+  if (!box) return;
+  const p = ttsState.plan;
+  if (!p || typeof p.custom_voice_slot !== "number" || p.custom_voice_slot > 0) {
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = `
+    <div class="tts-msg warn" style="margin-top:0;margin-bottom:12px">
+      현재 요금제(${esc((p.plan || "").toUpperCase())})에는 복제 슬롯이 없어
+      내 목소리 복제를 쓸 수 없습니다. 유료 플랜이 필요합니다.
+      <b>프리셋 찾기</b> 탭은 그대로 사용할 수 있습니다.
+    </div>`;
+}
 
 /* ── 초기화 ── */
 liveLoadKeywords();

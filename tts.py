@@ -84,7 +84,7 @@ def _fail(label, resp):
 
     hint = {
         401: "API 키가 잘못되었거나 만료됐습니다.",
-        403: "현재 요금제에서 막힌 기능입니다. 음성 복제는 유료 플랜이 필요합니다.",
+        403: "현재 요금제에서 허용되지 않는 요청입니다.",
         404: "존재하지 않는 음성입니다. 제공자 쪽에서 이미 삭제됐을 수 있습니다.",
         422: "요청 값이 유효하지 않습니다.",
         429: "호출 한도를 초과했습니다. 잠시 후 다시 시도하세요.",
@@ -343,6 +343,39 @@ def recommend_voices(query, count=5):
 
     log.info("프리셋 추천: query=%r → %d건", query[:60], len(out))
     return out
+
+
+def subscription():
+    """현재 요금제·크레딧·한도 조회. 크레딧은 1자 = 1크레딧이다."""
+    resp = _http_get(
+        "Typecast",
+        TYPECAST_API + "/v1/users/me/subscription",
+        {"X-API-KEY": _typecast_require()},
+    )
+    if resp.status_code != 200:
+        _fail("Typecast", resp)
+
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise TTSError("Typecast 구독 응답 형식이 예상과 다릅니다.")
+
+    credits = data.get("credits") or {}
+    limits  = data.get("limits") or {}
+    total   = credits.get("plan_credits")
+    used    = credits.get("used_credits")
+
+    remaining = None
+    if isinstance(total, (int, float)) and isinstance(used, (int, float)):
+        remaining = max(0, total - used)
+
+    return {
+        "plan":              data.get("plan"),
+        "plan_credits":      total,
+        "used_credits":      used,
+        "remaining_credits": remaining,
+        "concurrency_limit": limits.get("concurrency_limit"),
+        "custom_voice_slot": limits.get("custom_voice_slot"),
+    }
 
 
 # ── 제공자 레지스트리 ───────────────────────────────────────────────────────

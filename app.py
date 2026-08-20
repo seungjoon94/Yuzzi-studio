@@ -389,6 +389,18 @@ def api_tts_save_preset():
                     "label": label[:60], "owner": owner, "preset": True})
 
 
+@app.route("/api/tts/plan")
+def api_tts_plan():
+    """Typecast 요금제·잔여 크레딧·복제 슬롯. 화면 상단 배지에 쓴다."""
+    owner, err = _tts_guard()
+    if err:
+        return err
+    try:
+        return jsonify(tts.subscription())
+    except tts.TTSError as e:
+        return jsonify({"error": str(e)}), 502
+
+
 # ── 페이지 ──────────────────────────────────────────────────────────────────
 
 @app.route("/")
