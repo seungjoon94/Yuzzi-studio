@@ -10,3 +10,13 @@ services:
         value: 3.12.0
       - key: DATABASE_URL
         sync: false
+      # 나만의 TTS
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: TYPECAST_API_KEY
+        sync: false
+      # "이름:패스코드,이름2:패스코드2" — 없으면 TTS 기능이 닫힌다
+      - key: TTS_USERS
+        sync: false
+      - key: TTS_MAX_CHARS
+        value: "1000"

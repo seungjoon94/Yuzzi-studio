@@ -49,6 +49,18 @@ def init_db():
             PRIMARY KEY (keyword_id, slug)
         )
     """)
+    # 나만의 TTS — 복제된 음성 목록. 오디오는 제공자 쪽에 있고 여기엔 참조만 둔다.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tts_voices (
+            id         SERIAL PRIMARY KEY,
+            provider   TEXT NOT NULL,
+            voice_id   TEXT NOT NULL,
+            label      TEXT NOT NULL,
+            owner      TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE (provider, voice_id)
+        )
+    """)
     conn.commit()
     cur.close()
     conn.close()
@@ -225,3 +237,73 @@ def get_snapshot_emoticons(snapshot_id: int, keyword_id: int) -> list[dict]:
     cur.close()
     conn.close()
     return emots
+
+
+# ── 나만의 TTS ──────────────────────────────────────────────────────────────
+
+def add_tts_voice(provider: str, voice_id: str, label: str,
+                  owner: str, created_at: str) -> int:
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO tts_voices (provider, voice_id, label, owner, created_at)
+               VALUES (%s, %s, %s, %s, %s)
+               ON CONFLICT (provider, voice_id) DO UPDATE SET
+                   label = EXCLUDED.label,
+                   owner = EXCLUDED.owner
+               RETURNING id""",
+            (provider, voice_id, label, owner, created_at),
+        )
+        row_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return row_id
+    finally:
+        conn.close()
+
+
+def get_tts_voices() -> list[dict]:
+    """등록된 음성 전체. 2인이 같은 스튜디오를 쓰므로 owner를 함께 내려준다."""
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        """SELECT id, provider, voice_id, label, owner, created_at
+           FROM tts_voices ORDER BY id DESC"""
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return rows
+
+
+def get_tts_voice(row_id: int) -> dict | None:
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        """SELECT id, provider, voice_id, label, owner, created_at
+           FROM tts_voices WHERE id = %s""",
+        (row_id,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def delete_tts_voice(row_id: int) -> dict | None:
+    """삭제하고 삭제된 행을 반환. 제공자 쪽 원격 삭제에 provider/voice_id가 필요하다."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """DELETE FROM tts_voices WHERE id = %s
+               RETURNING id, provider, voice_id, label, owner""",
+            (row_id,),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        return dict(row) if row else None
+    finally:
+        conn.close()
