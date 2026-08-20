@@ -852,6 +852,44 @@
     .tts-plan.low  { background: #fff6e0; border-color: #f0dca8; color: #8a6100; }
     .tts-plan.out  { background: #fdecea; border-color: #f3c4be; color: #c0392b; }
 
+    /* 프리셋 탭 안의 하위 토글 */
+    .tts-subtabs {
+      display: flex; gap: 6px;
+      margin-bottom: 12px;
+    }
+    .tts-subtab {
+      flex: 1; text-align: center;
+      padding: 6px 8px;
+      font-size: 11.5px; font-weight: 600;
+      color: #888;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--card);
+      cursor: pointer; user-select: none;
+      transition: all .15s;
+    }
+    .tts-subtab:hover { border-color: #bbb; color: #444; }
+    .tts-subtab.active {
+      border-color: var(--yellow-dark);
+      background: rgba(249,224,0,.16);
+      color: #6b5a00;
+    }
+
+    /* 필터 두 칸 배치 */
+    .tts-filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .tts-filters .tts-field { margin-bottom: 0; }
+    .tts-filters .tts-field.wide { grid-column: 1 / -1; }
+
+    .tts-result-count {
+      font-size: 11px; color: var(--muted);
+      margin-bottom: 8px;
+    }
+
     /* 공통 상태 */
     .loading {
       padding: 50px;
@@ -1071,16 +1109,48 @@
           <div id="ttsModePreset" style="display:none">
 
             <div class="tts-card-sub">
-              원하는 목소리를 말로 설명하면 Typecast 프리셋 중에서 찾아줍니다.
-              들어보고 마음에 들면 목록에 담으세요.
+              Typecast 프리셋 목소리를 찾아 들어보고, 마음에 들면 목록에 담으세요.
             </div>
 
-            <div class="tts-field">
-              <label class="tts-label" for="ttsQuery">어떤 목소리를 원하세요?</label>
-              <textarea class="tts-textarea" id="ttsQuery" maxlength="500"
-                        style="min-height:70px"
-                        placeholder="예: 이모티콘 소개 쇼츠에 어울리는 밝고 발랄한 20대 여성 목소리"
-                        onkeydown="if(event.key==='Enter'&amp;&amp;(event.ctrlKey||event.metaKey))ttsSearchVoices()"></textarea>
+            <div class="tts-subtabs">
+              <div class="tts-subtab active" data-find="desc"
+                   onclick="ttsSwitchFind('desc')">설명으로</div>
+              <div class="tts-subtab" data-find="filter"
+                   onclick="ttsSwitchFind('filter')">조건으로</div>
+            </div>
+
+            <!-- 찾기 1: 자연어 설명 -->
+            <div id="ttsFindDesc">
+              <div class="tts-field">
+                <label class="tts-label" for="ttsQuery">어떤 목소리를 원하세요?</label>
+                <textarea class="tts-textarea" id="ttsQuery" maxlength="500"
+                          style="min-height:70px"
+                          placeholder="예: 이모티콘 소개 쇼츠에 어울리는 밝고 발랄한 20대 여성 목소리"
+                          onkeydown="if(event.key==='Enter'&amp;&amp;(event.ctrlKey||event.metaKey))ttsSearchVoices()"></textarea>
+              </div>
+            </div>
+
+            <!-- 찾기 2: 조건 필터 -->
+            <div id="ttsFindFilter" style="display:none">
+              <div class="tts-field" style="margin-bottom:8px">
+                <label class="tts-label" for="ttsFName">이름 (일부만 입력해도 됩니다)</label>
+                <input class="tts-input" id="ttsFName" placeholder="비워두면 전체"
+                       onkeydown="if(event.key==='Enter')ttsSearchByFilter()">
+              </div>
+              <div class="tts-filters">
+                <div class="tts-field">
+                  <label class="tts-label" for="ttsFGender">성별</label>
+                  <select class="tts-select" id="ttsFGender"></select>
+                </div>
+                <div class="tts-field">
+                  <label class="tts-label" for="ttsFAge">나이</label>
+                  <select class="tts-select" id="ttsFAge"></select>
+                </div>
+                <div class="tts-field wide">
+                  <label class="tts-label" for="ttsFUse">용도</label>
+                  <select class="tts-select" id="ttsFUse"></select>
+                </div>
+              </div>
             </div>
 
             <div class="tts-field">
@@ -1092,11 +1162,13 @@
             </div>
 
             <button class="btn btn-yellow" style="width:100%" id="ttsSearchBtn"
-                    onclick="ttsSearchVoices()">목소리 찾기</button>
+                    onclick="ttsRunFind()">목소리 찾기</button>
 
             <div class="tts-demo-player" id="ttsDemoPlayer"></div>
             <div id="ttsPresetMsg"></div>
-            <div id="ttsCandidates" style="margin-top:12px"></div>
+            <div class="tts-result-count" id="ttsResultCount"
+                 style="display:none;margin-top:12px"></div>
+            <div id="ttsCandidates"></div>
 
           </div><!-- /ttsModePreset -->
         </div>
@@ -1593,6 +1665,8 @@ const ttsState = {
   candidates: [],
   demoUrl:   null,
   plan:      null,
+  findMode:  "desc",
+  facets:    null,
 };
 
 function ttsHeaders(extra) {
@@ -2150,6 +2224,11 @@ async function ttsSearchVoices() {
     if (!res.ok) throw new Error(data.error || "추천 실패");
     ttsState.candidates = Array.isArray(data) ? data : [];
     ttsRenderCandidates();
+    const cnt = document.getElementById("ttsResultCount");
+    if (cnt) {
+      cnt.textContent = `설명과 가장 잘 맞는 ${ttsState.candidates.length}건 (매칭 점수순)`;
+      cnt.style.display = ttsState.candidates.length ? "" : "none";
+    }
   } catch (e) {
     box.innerHTML = "";
     ttsMsg("ttsPresetMsg", "err", e.message);
@@ -2169,8 +2248,9 @@ function ttsRenderCandidates() {
   }
 
   box.innerHTML = list.map((v, i) => {
-    const score = Number(v.score);
-    const pct   = Math.round(Math.max(0, Math.min(1, isNaN(score) ? 0 : score)) * 100);
+    const hasScore = typeof v.score === "number" && !isNaN(v.score);
+    const pct   = hasScore
+      ? Math.round(Math.max(0, Math.min(1, v.score)) * 100) : 0;
     const tags  = [];
     if (v.gender) tags.push(TTS_GENDER_KO[v.gender] || v.gender);
     if (v.age)    tags.push(TTS_AGE_KO[v.age] || v.age);
@@ -2185,9 +2265,11 @@ function ttsRenderCandidates() {
       <div class="tts-cand">
         <div class="tts-cand-head">
           <span class="tts-cand-name">${esc(v.voice_name || v.voice_id)}</span>
-          <span class="tts-cand-score">${pct}%</span>
+          ${hasScore ? `<span class="tts-cand-score">${pct}%</span>` : ""}
         </div>
-        <div class="tts-score-bar"><span style="width:${pct}%"></span></div>
+        ${hasScore
+          ? `<div class="tts-score-bar"><span style="width:${pct}%"></span></div>`
+          : `<div style="height:8px"></div>`}
         <div class="tts-cand-tags">
           ${tags.map(t => `<span class="tts-tag">${esc(t)}</span>`).join("")}
           ${emoTag}
@@ -2336,6 +2418,106 @@ function ttsRenderSlotWarning() {
       내 목소리 복제를 쓸 수 없습니다. 유료 플랜이 필요합니다.
       <b>프리셋 찾기</b> 탭은 그대로 사용할 수 있습니다.
     </div>`;
+}
+
+/* ════════ 조건으로 찾기 ════════ */
+
+const TTS_USE_ALL = "__all__";
+
+function ttsSwitchFind(kind) {
+  document.querySelectorAll(".tts-subtab").forEach(t =>
+    t.classList.toggle("active", t.dataset.find === kind));
+  const d = document.getElementById("ttsFindDesc");
+  const f = document.getElementById("ttsFindFilter");
+  if (d) d.style.display = kind === "desc"   ? "" : "none";
+  if (f) f.style.display = kind === "filter" ? "" : "none";
+  ttsState.findMode = kind;
+  if (kind === "filter") ttsLoadFacets();
+}
+
+function ttsRunFind() {
+  if (ttsState.findMode === "filter") ttsSearchByFilter();
+  else ttsSearchVoices();
+}
+
+/** 필터 선택지를 카탈로그에서 받아 채운다. 한 번만 호출된다. */
+async function ttsLoadFacets() {
+  if (ttsState.facets) return;
+  const gSel = document.getElementById("ttsFGender");
+  const aSel = document.getElementById("ttsFAge");
+  const uSel = document.getElementById("ttsFUse");
+  if (!gSel || !aSel || !uSel) return;
+
+  try {
+    const res  = await fetch("/api/tts/voices/facets", { headers: ttsHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "선택지 조회 실패");
+    ttsState.facets = data;
+
+    const opt = (val, text, n) =>
+      `<option value="${esc(val)}">${esc(text)}${n != null ? ` (${n})` : ""}</option>`;
+
+    gSel.innerHTML = opt(TTS_USE_ALL, "전체", data.total)
+      + (data.gender || []).map(f =>
+          opt(f.value, TTS_GENDER_KO[f.value] || f.value, f.count)).join("");
+
+    aSel.innerHTML = opt(TTS_USE_ALL, "전체")
+      + (data.age || []).map(f =>
+          opt(f.value, TTS_AGE_KO[f.value] || f.value, f.count)).join("");
+
+    uSel.innerHTML = opt(TTS_USE_ALL, "전체")
+      + (data.use_case || []).map(f => opt(f.value, f.value, f.count)).join("");
+  } catch (e) {
+    ttsMsg("ttsPresetMsg", "err", e.message);
+  }
+}
+
+function ttsFilterVal(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.value || el.value === TTS_USE_ALL) return "";
+  return el.value;
+}
+
+async function ttsSearchByFilter() {
+  const btn = document.getElementById("ttsSearchBtn");
+  const box = document.getElementById("ttsCandidates");
+  const cnt = document.getElementById("ttsResultCount");
+
+  btn.disabled    = true;
+  btn.textContent = "찾는 중...";
+  ttsMsg("ttsPresetMsg", "", "");
+  box.innerHTML = `<div class="loading"><span class="spinner"></span></div>`;
+  cnt.style.display = "none";
+
+  const qs = new URLSearchParams({ limit: "30" });
+  const nameEl = document.getElementById("ttsFName");
+  if (nameEl && nameEl.value.trim()) qs.set("name", nameEl.value.trim());
+  const g = ttsFilterVal("ttsFGender"); if (g) qs.set("gender", g);
+  const a = ttsFilterVal("ttsFAge");    if (a) qs.set("age", a);
+  const u = ttsFilterVal("ttsFUse");    if (u) qs.set("use_case", u);
+
+  try {
+    const res  = await fetch("/api/tts/voices/search?" + qs.toString(),
+                             { headers: ttsHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "검색 실패");
+
+    ttsState.candidates = data.voices || [];
+    ttsRenderCandidates();
+
+    if (data.total) {
+      cnt.textContent = data.total > data.shown
+        ? `조건에 맞는 ${data.total}건 중 ${data.shown}건 표시 — 조건을 좁혀보세요.`
+        : `조건에 맞는 ${data.total}건`;
+      cnt.style.display = "";
+    }
+  } catch (e) {
+    box.innerHTML = "";
+    ttsMsg("ttsPresetMsg", "err", e.message);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "목소리 찾기";
+  }
 }
 
 /* ── 초기화 ── */

@@ -345,6 +345,80 @@ def recommend_voices(query, count=5):
     return out
 
 
+def catalog_facets():
+    """필터 선택지를 카탈로그에서 뽑아낸다. 하드코딩보다 정확하다."""
+    cat = voice_catalog()
+    genders, ages, uses = {}, {}, {}
+
+    for v in cat.values():
+        if v.get("voice_type") == "custom":
+            continue
+        g = v.get("gender")
+        if g:
+            genders[g] = genders.get(g, 0) + 1
+        a = v.get("age")
+        if a:
+            ages[a] = ages.get(a, 0) + 1
+        for u in v.get("use_cases") or []:
+            uses[str(u)] = uses.get(str(u), 0) + 1
+
+    def rank(d):
+        # 많이 쓰이는 값부터, 같으면 이름순
+        return [{"value": k, "count": n}
+                for k, n in sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    return {
+        "total":    sum(1 for v in cat.values() if v.get("voice_type") != "custom"),
+        "gender":   rank(genders),
+        "age":      rank(ages),
+        "use_case": rank(uses),
+    }
+
+
+def search_voices(name=None, gender=None, age=None, use_case=None, limit=30):
+    """캐시된 카탈로그를 조건으로 걸러 반환. Typecast 추가 호출이 없다."""
+    cat = voice_catalog()
+
+    needle   = (name or "").strip().lower()
+    gender   = ((gender or "").strip().lower() or None)
+    age      = ((age or "").strip().lower() or None)
+    use_case = ((use_case or "").strip().lower() or None)
+    lim      = int(_clamp(limit, 1, 100, 30))
+
+    hits = []
+    for v in cat.values():
+        # 복제 음성은 이미 내 목록에 있으므로 탐색 대상이 아니다
+        if v.get("voice_type") == "custom":
+            continue
+        if needle and needle not in (v.get("voice_name") or "").lower():
+            continue
+        if gender and (v.get("gender") or "").lower() != gender:
+            continue
+        if age and (v.get("age") or "").lower() != age:
+            continue
+        if use_case:
+            cases = [str(u).lower() for u in (v.get("use_cases") or [])]
+            if use_case not in cases:
+                continue
+        hits.append(v)
+
+    hits.sort(key=lambda v: (v.get("voice_name") or "").lower())
+
+    voices = [{
+        "voice_id":   v["voice_id"],
+        "voice_name": v.get("voice_name") or "",
+        "score":      None,              # 조건 검색에는 매칭 점수가 없다
+        "gender":     v.get("gender"),
+        "age":        v.get("age"),
+        "use_cases":  list(v.get("use_cases") or [])[:3],
+        "emotions":   _emotions_for(v),
+    } for v in hits[:lim]]
+
+    log.info("조건 검색: name=%r gender=%s age=%s use_case=%s → %d/%d건",
+             needle, gender, age, use_case, len(voices), len(hits))
+    return {"total": len(hits), "shown": len(voices), "voices": voices}
+
+
 def subscription():
     """현재 요금제·크레딧·한도 조회. 크레딧은 1자 = 1크레딧이다."""
     resp = _http_get(

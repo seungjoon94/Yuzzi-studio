@@ -389,6 +389,42 @@ def api_tts_save_preset():
                     "label": label[:60], "owner": owner, "preset": True})
 
 
+@app.route("/api/tts/voices/facets")
+def api_tts_facets():
+    """조건 검색 드롭다운 선택지. 카탈로그에서 실제 값을 뽑는다."""
+    owner, err = _tts_guard()
+    if err:
+        return err
+    try:
+        return jsonify(tts.catalog_facets())
+    except tts.TTSError as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/tts/voices/search")
+def api_tts_search_voices():
+    """이름/성별/나이/용도로 프리셋 목소리를 찾는다."""
+    owner, err = _tts_guard()
+    if err:
+        return err
+
+    try:
+        limit = int(request.args.get("limit", 30))
+    except (TypeError, ValueError):
+        limit = 30
+
+    try:
+        return jsonify(tts.search_voices(
+            name=request.args.get("name"),
+            gender=request.args.get("gender"),
+            age=request.args.get("age"),
+            use_case=request.args.get("use_case"),
+            limit=limit,
+        ))
+    except tts.TTSError as e:
+        return jsonify({"error": str(e)}), 502
+
+
 @app.route("/api/tts/plan")
 def api_tts_plan():
     """Typecast 요금제·잔여 크레딧·복제 슬롯. 화면 상단 배지에 쓴다."""
